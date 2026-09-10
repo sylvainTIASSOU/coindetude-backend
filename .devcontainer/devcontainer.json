@@ -1,0 +1,48 @@
+{
+  "name": "coindetude-backend",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "api",
+  "workspaceFolder": "/workspace",
+  "overrideCommand": true,
+  "shutdownAction": "stopCompose",
+
+  "forwardPorts": [8000, 5432, 8080],
+  "portsAttributes": {
+    "8000": { "label": "FastAPI", "onAutoForward": "notify" },
+    "5432": { "label": "PostgreSQL" },
+    "8080": { "label": "Adminer" }
+  },
+
+  "postCreateCommand": "poetry install --with dev && poetry run pre-commit install",
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["app/tests"],
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports.ruff": "explicit",
+          "source.fixAll.ruff": "explicit"
+        },
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        }
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "ms-python.mypy-type-checker",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
+        "njpwerner.autodocstring",
+        "tamasfe.even-better-toml",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+
+  "remoteUser": "root"
+}

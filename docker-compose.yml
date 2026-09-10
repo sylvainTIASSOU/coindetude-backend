@@ -1,0 +1,48 @@
+services:
+  api:
+    build:
+      context: .
+      target: development
+    volumes:
+      - .:/workspace:cached
+      # Volume anonyme pour ne pas laisser l'hôte écraser les paquets
+      # installés dans l'image (utile sur Arch/Linux comme sur Mac/Windows).
+      - api-venv:/workspace/.venv
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    # En devcontainer, VS Code écrase cette commande pour garder le
+    # conteneur vivant et s'y attacher (voir .devcontainer/devcontainer.json).
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-coindetude}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coindetude}
+      POSTGRES_DB: ${POSTGRES_DB:-coindetude}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-coindetude}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
+  api-venv:
