@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(poetry run *)",
+      "Bash(tee /tmp/claude-0/-coindetude-backend/8de38af4-1d83-4b74-82a9-fa3e90e25331/scratchpad/srv.log)",
+      "Bash(/usr/local/bin/python -c \"import fastapi; print\\('fastapi', fastapi.__version__\\)\")",
+      "Read(//usr/local/bin/**)",
+      "Bash(poetry env *)",
+      "Bash(poetry config *)",
+      "Bash(/coindetude-backend/.venv/bin/python -c \"import fastapi_cli; print\\('fastapi_cli ok'\\)\")",
+      "Bash(/coindetude-backend/.venv/bin/fastapi --version)",
+      "Bash(/usr/local/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8012)",
+      "Bash(tee /tmp/claude-0/-coindetude-backend/8de38af4-1d83-4b74-82a9-fa3e90e25331/scratchpad/uv.log)",
+      "Bash(curl -s -o /dev/null -m 8 -w \"jsdelivr css -> %{http_code} \\(%{time_total}s\\)\\\\n\" https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css)",
+      "Bash(curl -s -o /dev/null -m 8 -w \"jsdelivr js -> %{http_code}\\\\n\" https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js)",
+      "Bash(getent hosts *)",
+      "Bash(git -C /coindetude-backend diff --stat)",
+      "Bash(git -C /coindetude-backend diff .devcontainer/devcontainer.json Dockerfile docker-compose.yml .dockerignore)",
+      "Bash(curl -s -o /dev/null -m 3 -w \"%{http_code}\\\\n\" http://127.0.0.1:8000/docs)",
+      "Read(//proc/8037/net/**)",
+      "Read(//etc/**)",
+      "Bash(curl -s -o /dev/null -m 4 -w \"%{http_code}\\\\n\" http://172.18.0.4:8000/docs)",
+      "Bash(curl -s -o /dev/null -m 4 -w \"%{http_code}\\\\n\" http://31eb18207212:8000/docs)",
+      "Bash(curl -s -m 4 http://127.0.0.1:8000/docs)",
+      "Bash(curl -s -o /dev/null -m 4 -w \"/api/v1/openapi.json -> %{http_code}\\\\n\" http://127.0.0.1:8000/api/v1/openapi.json)"
+    ]
+  }
+}

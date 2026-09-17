@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # --- Sécurité ---
     SECRET_KEY: str  # obligatoire, pas de valeur par défaut en dur
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24h
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7 jours
     JWT_ALGORITHM: str = "HS256"
 
     # --- CORS (origines Flutter web / dashboard admin, etc.) ---

@@ -4,10 +4,10 @@ services:
       context: .
       target: development
     volumes:
-      - .:/workspace:cached
+      - .:/coindetude-backend:cached
       # Volume anonyme pour ne pas laisser l'hôte écraser les paquets
       # installés dans l'image (utile sur Arch/Linux comme sur Mac/Windows).
-      - api-venv:/workspace/.venv
+      - api-venv:/coindetude-backend/.venv
     env_file:
       - .env
     ports:

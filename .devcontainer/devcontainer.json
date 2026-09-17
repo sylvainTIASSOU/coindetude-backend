@@ -1,34 +1,76 @@
 {
   "name": "coindetude-backend",
-  "dockerComposeFile": ["../docker-compose.yml"],
+  "dockerComposeFile": [
+    "../docker-compose.yml"
+  ],
   "service": "api",
-  "workspaceFolder": "/workspace",
+  "workspaceFolder": "/coindetude-backend",
   "overrideCommand": true,
   "shutdownAction": "stopCompose",
-
-  "forwardPorts": [8000, 5432, 8080],
+  // Crée .env depuis .env.example sur l'hôte avant le build, sinon
+  // `docker compose up` échoue (docker-compose.yml référence env_file: .env
+  // qui n'existe pas sur un clone neuf). N'écrase jamais un .env existant.
+  "initializeCommand": [
+    "sh",
+    "-c",
+    "test -f .env || cp .env.example .env"
+  ],
+  "forwardPorts": [
+    8000,
+    5432,
+    8080
+  ],
   "portsAttributes": {
-    "8000": { "label": "FastAPI", "onAutoForward": "notify" },
-    "5432": { "label": "PostgreSQL" },
-    "8080": { "label": "Adminer" }
+    "8000": {
+      "label": "FastAPI",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "8080": {
+      "label": "Adminer",
+      "onAutoForward": "silent"
+    }
   },
-
-  "postCreateCommand": "poetry install --with dev && poetry run pre-commit install",
-
+  "postCreateCommand": "poetry install --with dev",
   "customizations": {
     "vscode": {
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
         "python.testing.pytestEnabled": true,
-        "python.testing.pytestArgs": ["app/tests"],
+        "python.testing.pytestArgs": [
+          "app/tests"
+        ],
         "editor.formatOnSave": true,
+        "editor.rulers": [
+          100
+        ],
         "editor.codeActionsOnSave": {
           "source.organizeImports.ruff": "explicit",
           "source.fixAll.ruff": "explicit"
         },
         "[python]": {
           "editor.defaultFormatter": "charliermarsh.ruff"
-        }
+        },
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/.mypy_cache": true,
+          "**/.ruff_cache": true,
+          "**/.pytest_cache": true
+        },
+        "sqltools.connections": [
+          {
+            "name": "CoinDétude (devcontainer)",
+            "driver": "PostgreSQL",
+            "server": "db",
+            "port": 5432,
+            "database": "coindetude",
+            "username": "coindetude",
+            "password": "coindetude"
+          }
+        ]
       },
       "extensions": [
         "ms-python.python",
@@ -39,10 +81,12 @@
         "mtxr.sqltools-driver-pg",
         "njpwerner.autodocstring",
         "tamasfe.even-better-toml",
-        "ms-azuretools.vscode-docker"
+        "redhat.vscode-yaml",
+        "ms-azuretools.vscode-docker",
+        "eamodio.gitlens",
+        "anthropic.claude-code"
       ]
     }
   },
-
   "remoteUser": "root"
 }

@@ -11,7 +11,7 @@ from app.db.base import Base
 
 # Importer ici tous les modules de modèles pour que Base.metadata
 # les connaisse (indispensable pour `alembic revision --autogenerate`).
-from app.models import user  # noqa: F401
+from app.models import educational_framework, user  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

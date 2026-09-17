@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN pip install --no-cache-dir poetry==2.4.3
 
-WORKDIR /workspace
+WORKDIR /coindetude-backend
 
 
 # ---------- Développement (utilisé par .devcontainer) ----------

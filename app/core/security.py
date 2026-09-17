@@ -34,6 +34,12 @@ def create_access_token(subject: str, extra_claims: dict[str, Any] | None = None
         to_encode.update(extra_claims)
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
+def create_refresh_token(subject: str, extra_claims: dict[str, Any] | None = None) -> str:
+    expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode: dict[str, Any] = {"sub": subject, "exp": expire}
+    if extra_claims:
+        to_encode.update(extra_claims)
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 def decode_access_token(token: str) -> dict[str, Any]:
     """Lève jwt.PyJWTError (ExpiredSignatureError, InvalidTokenError, ...) si invalide."""
