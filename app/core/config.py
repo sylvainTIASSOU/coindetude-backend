@@ -72,22 +72,27 @@ class Settings(BaseSettings):
         "image/jpeg",
         "application/pdf",
     ]
-    UPLOAD_PRESIGN_TTL_SECONDS: int = 900        # 15 min
-    UPLOAD_GET_TTL_SECONDS: int = 3600           # 1 h pour la lecture
-    UPLOAD_PENDING_TTL_HOURS: int = 24           # purge différée
-    S3_AUTO_CREATE_BUCKET_IN_DEV: bool = True    # crée le bucket au démarrage
+    UPLOAD_PRESIGN_TTL_SECONDS: int = 900  # 15 min
+    UPLOAD_GET_TTL_SECONDS: int = 3600  # 1 h pour la lecture
+    UPLOAD_PENDING_TTL_HOURS: int = 24  # purge différée
+    S3_AUTO_CREATE_BUCKET_IN_DEV: bool = True  # crée le bucket au démarrage
 
     # --- Worker ARQ ---
     WORKER_ENABLED: bool = True
-    WORKER_REDIS_DB: int = 1                    # DB Redis dédiée au broker ARQ
+    WORKER_REDIS_DB: int = 1  # DB Redis dédiée au broker ARQ
     WORKER_MAX_JOBS: int = 10
-    WORKER_JOB_TIMEOUT_SECONDS: int = 300       # 5 min max par job
-    WORKER_KEEP_RESULT_SECONDS: int = 3600      # 1h de rétention des résultats
+    WORKER_JOB_TIMEOUT_SECONDS: int = 300  # 5 min max par job
+    WORKER_KEEP_RESULT_SECONDS: int = 3600  # 1h de rétention des résultats
 
     # --- Telemetry consumer ---
-    TELEMETRY_CONSUMER_BATCH_SIZE: int = 100    # events par pop
+    POSTHOG_URL: str = ""
+    POSTHOG_PERSONAL_API_KEY: str = ""
+    POSTHOG_ENABLED: bool = False
+    TELEMETRY_QUEUE_KEY: str = "telemetry:queue"
+    TELEMETRY_DLQ_KEY: str = "telemetry:dlq"
+    TELEMETRY_CONSUMER_BATCH_SIZE: int = 100  # events par pop
     TELEMETRY_CONSUMER_MAX_RETRIES: int = 3
-    TELEMETRY_POSTHOG_BATCH_URL: str = ""       # si vide : {POSTHOG_URL}/batch/
+    TELEMETRY_POSTHOG_BATCH_URL: str = ""  # si vide : {POSTHOG_URL}/batch/
 
     # --- Purges ---
     PURGE_OTP_RETENTION_DAYS: int = 7

@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models import User
+from app.models.enums import UserRole
 
 # tokenUrl pointe vers un endpoint de login pour Swagger
 oauth2_scheme = OAuth2PasswordBearer(
@@ -56,7 +57,19 @@ async def get_current_user(
         raise credentials_exc
     return user
 
+async def require_admin(current_user: CurrentUser) -> User:
+    """Dépendance qui exige un rôle ``admin``.
 
+    Utilisée sur les endpoints ``/admin/*``. Renvoie 403 si l'utilisateur
+    n'a pas le rôle ``admin``, sans révéler l'existence de la ressource.
+    """
+    if current_user.role is not UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès réservé aux administrateurs.",
+        )
+    return current_user
 # Alias typé pour lisibilité dans les signatures
 CurrentUser = Annotated[User, Depends(get_current_user)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]
+AdminUser = Annotated[User, Depends(require_admin)]

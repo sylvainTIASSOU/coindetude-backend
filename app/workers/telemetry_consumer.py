@@ -20,14 +20,13 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
-
 from app.core.logging import log as logger
 
 
 def _posthog_batch_url() -> str:
     if settings.TELEMETRY_POSTHOG_BATCH_URL:
         return settings.TELEMETRY_POSTHOG_BATCH_URL
-    base = settings.POSTHOG_URL.rstrip("/") # type: ignore
+    base = settings.POSTHOG_URL.rstrip("/")
     return f"{base}/batch/"
 
 
@@ -65,16 +64,16 @@ async def send_batch_to_posthog(
     if not settings.POSTHOG_ENABLED or not settings.POSTHOG_URL:
         logger.info(
             "[MOCK] PostHog batch de %d events pour user=%s",
-            len(events), user_id,
+            len(events),
+            user_id,
         )
         return True, None
 
-    payload = {
+    payload: dict[str, Any] = {
         "api_key": settings.POSTHOG_PERSONAL_API_KEY,
         "historical_migration": False,
         "batch": [
-            _to_posthog_event(e, distinct_id=user_id, country_code=country_code)
-            for e in events
+            _to_posthog_event(e, distinct_id=user_id, country_code=country_code) for e in events
         ],
     }
     try:
@@ -140,18 +139,14 @@ async def telemetry_consumer(ctx: dict[str, Any]) -> dict[str, int]:
         # Retry : on ré-empile en fin de queue (re-tenté au prochain run)
         retries = parsed.get("retries", 0) + 1
         if retries >= settings.TELEMETRY_CONSUMER_MAX_RETRIES:
-            logger.error(
-                "Telemetry item échoué %d fois, DLQ : %s", retries, err
-            )
+            logger.error("Telemetry item échoué %d fois, DLQ : %s", retries, err)
             await redis.lpush(settings.TELEMETRY_DLQ_KEY, raw)
             stats["dlq"] += 1
         else:
             parsed["retries"] = retries
             parsed["last_error"] = err
             # Backoff : on repousse en fin de queue pour ne pas boucler
-            await redis.rpush(
-                settings.TELEMETRY_QUEUE_KEY, json.dumps(parsed, default=str)
-            )
+            await redis.rpush(settings.TELEMETRY_QUEUE_KEY, json.dumps(parsed, default=str))
             stats["requeued"] += 1
 
     logger.info("Telemetry consumer : %s", stats)
