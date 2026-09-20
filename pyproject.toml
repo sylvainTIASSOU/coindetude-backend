@@ -74,3 +74,6 @@ exclude = ["alembic"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["app/tests"]
+
+[tool.fastapi]
+entrypoint = "app.main:app"
