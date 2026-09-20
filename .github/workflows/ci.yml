@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==1.8.4
+      - name: Install deps
+        run: poetry install --with dev --no-root
+      - name: Ruff lint
+        run: poetry run ruff check app/
+      - name: Ruff format check
+        run: poetry run ruff format --check app/
+      - name: Mypy
+        run: poetry run mypy app/
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: coindetude
+          POSTGRES_PASSWORD: coindetude
+          POSTGRES_DB: coindetude_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      SECRET_KEY: ci-test-secret-key-min-32-chars-long-xxxxx
+      POSTGRES_SERVER: localhost
+      POSTGRES_USER: coindetude
+      POSTGRES_PASSWORD: coindetude
+      POSTGRES_DB: coindetude_test
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      ENVIRONMENT: dev
+      AUTO_SEED_ENABLED: "false"
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_ACCESS_KEY_ID: test
+      S3_SECRET_ACCESS_KEY: test
+      S3_BUCKET_NAME: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==1.8.4
+      - name: Install deps
+        run: poetry install --with dev --no-root
+      - name: Run migrations
+        run: poetry run alembic upgrade head
+      - name: Run tests
+        run: poetry run pytest app/tests/ -v -m "not integration and not e2e"
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t coindetude-backend:ci .
+      - name: Smoke test image
+        run: |
+          docker run --rm coindetude-backend:ci python -c "import app.main; print('OK')"

@@ -77,6 +77,23 @@ class Settings(BaseSettings):
     UPLOAD_PENDING_TTL_HOURS: int = 24           # purge différée
     S3_AUTO_CREATE_BUCKET_IN_DEV: bool = True    # crée le bucket au démarrage
 
+    # --- Worker ARQ ---
+    WORKER_ENABLED: bool = True
+    WORKER_REDIS_DB: int = 1                    # DB Redis dédiée au broker ARQ
+    WORKER_MAX_JOBS: int = 10
+    WORKER_JOB_TIMEOUT_SECONDS: int = 300       # 5 min max par job
+    WORKER_KEEP_RESULT_SECONDS: int = 3600      # 1h de rétention des résultats
+
+    # --- Telemetry consumer ---
+    TELEMETRY_CONSUMER_BATCH_SIZE: int = 100    # events par pop
+    TELEMETRY_CONSUMER_MAX_RETRIES: int = 3
+    TELEMETRY_POSTHOG_BATCH_URL: str = ""       # si vide : {POSTHOG_URL}/batch/
+
+    # --- Purges ---
+    PURGE_OTP_RETENTION_DAYS: int = 7
+    PURGE_PENDING_UPLOADS_HOURS: int = 24
+    SUBSCRIPTION_CHECK_INTERVAL_MINUTES: int = 15
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def REDIS_URL(self) -> str:

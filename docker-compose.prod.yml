@@ -1,0 +1,64 @@
+# =============================================================================
+# docker-compose.prod.yml — Déploiement production
+# =============================================================================
+# Utilise : docker compose -f docker-compose.prod.yml up -d
+#
+# Différences avec le dev :
+# - Pas de mount de code (image immuable)
+# - Pas d'Adminer, MinIO, ni Mailhog
+# - Utilise R2/S3 externe et Redis managé (Upstash)
+# - Gunicorn + Uvicorn workers (pas de --reload)
+# - Worker ARQ séparé
+# =============================================================================
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: coindetude-backend:${IMAGE_TAG:-latest}
+    container_name: coindetude-api
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      PORT: 8000
+      WEB_CONCURRENCY: 2
+    ports:
+      - "8000:8000"
+    command: ["api"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - coindetude-prod
+
+  worker:
+    image: coindetude-backend:${IMAGE_TAG:-latest}
+    container_name: coindetude-worker
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    command: ["worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - coindetude-prod
+
+networks:
+  coindetude-prod:
+    driver: bridge
