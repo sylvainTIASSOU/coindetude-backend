@@ -1,48 +1,147 @@
+# Stack de développement CoinDetude
+# Services : PostgreSQL, Redis, Adminer (UI DB), MinIO (S3 local), API
+#
+# Usage :
+#   docker compose up -d              # démarre tout en arrière-plan
+#   docker compose logs -f api        # logs de l'API
+#   docker compose down -v            # arrête et supprime les volumes
+#
+# Accès :
+#   - API      : http://localhost:8000
+#   - Docs     : http://localhost:8000/docs (si DEBUG=true)
+#   - Adminer  : http://localhost:8080
+#   - MinIO UI : http://localhost:9001 (minioadmin / minioadmin)
+
 services:
   api:
     build:
       context: .
       target: development
+    container_name: coindetude-api
+    restart: unless-stopped
     volumes:
       - .:/coindetude-backend:cached
       # Volume anonyme pour ne pas laisser l'hôte écraser les paquets
       # installés dans l'image (utile sur Arch/Linux comme sur Mac/Windows).
       - api-venv:/coindetude-backend/.venv
+    working_dir: /coindetude-backend
     env_file:
       - .env
+    environment:
+      POSTGRES_SERVER: ${POSTGRES_USER:-coindetude}
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      S3_ENDPOINT_URL: http://minio:9000
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --log-level info
+    networks:
+      - coindetude-net
     # En devcontainer, VS Code écrase cette commande pour garder le
     # conteneur vivant et s'y attacher (voir .devcontainer/devcontainer.json).
 
+  # --- PostgreSQL ---
   db:
     image: postgres:16-alpine
+    container_name: coindetude-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-coindetude}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coindetude}
       POSTGRES_DB: ${POSTGRES_DB:-coindetude}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=fr_FR.UTF-8"
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-coindetude}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - coindetude-net
+
+  # --- Redis ---
+  redis:
+    image: redis:7-alpine
+    container_name: coindetude-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - coindetude-net
+
+  # --- MinIO (S3 local, alternative à R2 en dev) ---
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: coindetude-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-minioadmin}
+    ports:
+      - "9000:9000"   # API S3
+      - "9001:9001"   # Console web
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - coindetude-net
+
 
   adminer:
     image: adminer:latest
+    container_name: coindetude-adminer
     restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DESIGN: dracula
     ports:
       - "8080:8080"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    networks:
+      - coindetude-net
 
 volumes:
   pgdata:
   api-venv:
+  redis_data:
+  minio_data:
+
+networks:
+  coindetude-net:
+    driver: bridge

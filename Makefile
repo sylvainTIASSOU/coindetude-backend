@@ -1,7 +1,7 @@
 .PHONY: dev test lint format migrate revision shell
 
 dev:
-	poetry run fastapi dev app/main.py --host 0.0.0.0 --port 8000
+	poetry run fastapi dev app/main.py --host 0.0.0.0 --port 8008
 
 test:
 	poetry run pytest -v --cov=app

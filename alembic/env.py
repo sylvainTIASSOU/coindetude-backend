@@ -5,13 +5,14 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import app.models  # noqa: F401
 from alembic import context
 from app.core.config import settings
-from app.db.base import Base
 
-# Importer ici tous les modules de modèles pour que Base.metadata
-# les connaisse (indispensable pour `alembic revision --autogenerate`).
-from app.models import educational_framework, user  # noqa: F401
+# ⚠️ Importer app.models déclenche l'import de TOUS les sous-modules
+# (ai, auth, base, calendar, educational, file, notification, payment,
+#  plan, quiz, resource, user). Indispensable pour autogenerate.
+from app.models import Base  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
@@ -28,13 +29,20 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+        compare_server_default=True,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        compare_server_default=True,
+    )
     with context.begin_transaction():
         context.run_migrations()
 

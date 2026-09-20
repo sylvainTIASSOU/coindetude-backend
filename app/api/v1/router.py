@@ -2,12 +2,14 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, health, users
+from app.api.v1.endpoints import auth, health, sync, uploads
 
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
-api_router.include_router(users.router)
+api_router.include_router(sync.router)
+api_router.include_router(uploads.router)
+# api_router.include_router(users.router)
 
 # À mesure que les modules avancent, ajouter ici : referentiel, contenu,
 # assistant_ia, calendrier, paiement, espace_parent, marketplace, gamification...

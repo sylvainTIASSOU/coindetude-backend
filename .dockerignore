@@ -1,11 +1,44 @@
+# Git
 .git
-.venv
+.gitignore
+.github
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# Python
 __pycache__
-*.pyc
-.pytest_cache
-.mypy_cache
-.ruff_cache
+*.py[cod]
+*$py.class
+.Python
+.venv
+venv/
+env/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Poetry
+poetry.lock.bak
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Env
 .env
 .env.*
 !.env.example
-.devcontainer
+
+# Devcontainer
+.devcontainer/
+
+# Docs & divers
+*.md
+!README.md
+docs/
