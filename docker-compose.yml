@@ -7,8 +7,8 @@
 #   docker compose down -v            # arrête et supprime les volumes
 #
 # Accès :
-#   - API      : http://localhost:8000
-#   - Docs     : http://localhost:8000/docs (si DEBUG=true)
+#   - API      : http://localhost:8008
+#   - Docs     : http://localhost:8008/docs (si DEBUG=true)
 #   - Adminer  : http://localhost:8080
 #   - MinIO UI : http://localhost:9001 (minioadmin / minioadmin)
 
@@ -34,7 +34,7 @@ services:
       REDIS_PORT: 6379
       S3_ENDPOINT_URL: http://minio:9000
     ports:
-      - "8000:8000"
+      - "8008:8008"
     depends_on:
       db:
         condition: service_healthy
@@ -45,7 +45,7 @@ services:
     command: >
       uvicorn app.main:app
       --host 0.0.0.0
-      --port 8000
+      --port 8008
       --reload
       --log-level info
     networks:
@@ -161,7 +161,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/coindetude-backend:cached
-      - poetry_venv:/coindetude-backend/.venv
+      - api-venv:/coindetude-backend/.venv
     working_dir: /coindetude-backend
     command: >
       poetry run arq app.workers.settings.WorkerSettings

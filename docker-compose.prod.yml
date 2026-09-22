@@ -22,13 +22,13 @@ services:
     env_file:
       - .env.prod
     environment:
-      PORT: 8000
+      PORT: 8008
       WEB_CONCURRENCY: 2
     ports:
-      - "8000:8000"
+      - "8008:8008"
     command: ["api"]
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8008/api/v1/health"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     REDIS_PASSWORD: str | None = None
+    REDIS_USER: str = "user"
 
     # --- Uploads ---
     UPLOAD_MAX_SIZE_KB_DOCUMENT: int = 500
@@ -99,12 +100,14 @@ class Settings(BaseSettings):
     PURGE_PENDING_UPLOADS_HOURS: int = 24
     SUBSCRIPTION_CHECK_INTERVAL_MINUTES: int = 15
 
+    # REDIS_URL: str = ""  # construit dynamiquement si non fourni
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def REDIS_URL(self) -> str:
         """URL Redis complète."""
-        auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""
-        return f"redis://{auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+        # auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""
+        return f"redis://{self.REDIS_USER}:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
 
     # --- Cloudflare R2 (stockage PDF / fichiers, compatible S3) ---
     R2_ACCOUNT_ID: str = ""

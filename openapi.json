@@ -1,0 +1,3692 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CoinDétude API",
+    "summary": "API backend pour la plateforme scolaire CoinDétude",
+    "description": "\n## Bienvenue sur l'API CoinDétude 🇹🇬\n\n**CoinDétude** est la plateforme éducative d'accompagnement et de révision scolaire\npour les élèves togolais préparant les examens nationaux (**CEPD, BEPC, BAC 1 & 2**).\n\n### Architecture & Principes Directeurs\n1. **Frugalité Réseau & Offline-First** :\n   - L'application mobile Flutter fonctionne en mode déconnecté.\n   - Les mutations différées sont poussées vers `/api/v1/sync/apply-event`\n     avec un header `Idempotency-Key` (UUIDv4).\n   - Les fichiers ne transitent jamais directement par le backend :\n     upload direct via URLs présignées S3/R2.\n2. **Authentification Hybride Robuste** :\n   - Identifiant principal : Numéro de téléphone au format international (`+228XXXXXXXX`).\n   - OTP par SMS ou WhatsApp pour la validation de compte et réinitialisation de mot de passe.\n   - Sessions basées sur des tokens JWT courts (15 min) et des refresh tokens révocables (30 jours).\n3. **Sécurité & Contrôle d'Accès** :\n   - Fournir le token d'accès dans le header : `Authorization: Bearer <access_token>`.\n   - Rôles stricts : `student`, `parent`, `tutor`, `admin`.\n\n### Format des Erreurs Standard\nToutes les erreurs renvoient une charge utile JSON standard :\n```json\n{\n  \"detail\": \"Message explicatif de l'erreur ou liste des erreurs de validation\"\n}\n```\n",
+    "version": "0.1.0",
+    "contact": {
+      "name": "Support Technique CoinDétude",
+      "email": "contact@coindetude.tg",
+      "url": "https://coindetude-backend.fastapicloud.dev"
+    },
+    "license": {
+      "name": "Proprietary - CoinDétude",
+      "url": "https://coindetude-backend.fastapicloud.dev/terms"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Serveur de développement local"
+    },
+    {
+      "url": "https://staging-api.coindetude.tg",
+      "description": "Environnement de recette (Staging)"
+    },
+    {
+      "url": "https://api.coindetude.tg",
+      "description": "Environnement de production"
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "description": "Liveness : le process répond, sans dépendance externe.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness",
+        "description": "Readiness probe : l'app peut-elle servir du trafic ?\n\nVérifie :\n- Connexion PostgreSQL (SELECT 1)\n- Connexion Redis (PING)",
+        "operationId": "readiness",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Étape 1 — Inscription : envoie un OTP",
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OTPSentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Étape 1 — Login : envoie un OTP (ou skip si device de confiance)",
+        "operationId": "login",
+        "parameters": [
+          {
+            "name": "X-Trusted-Device",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Trusted-Device"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Login"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Forgot Password",
+        "operationId": "forgot_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OTPSentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/resend-otp": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Resend Otp",
+        "operationId": "resend_otp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendOTPRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OTPSentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify-otp": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Verify Otp",
+        "operationId": "verify_otp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOTPRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Reset Password",
+        "operationId": "reset_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Refresh",
+        "operationId": "refresh",
+        "parameters": [
+          {
+            "name": "X-Refresh-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Refresh-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "logout",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Refresh-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Refresh-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout-all": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout All",
+        "operationId": "logout_all",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sync/apply-event": {
+      "post": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "Synchronise une mutation offline (idempotent)",
+        "description": "Applique un événement offline avec idempotence stricte.",
+        "operationId": "apply_event",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 64,
+              "description": "UUID v4 obligatoire. Même clé + même body = même réponse.",
+              "title": "Idempotency-Key"
+            },
+            "description": "UUID v4 obligatoire. Même clé + même body = même réponse."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncEventRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Événement appliqué (ou replay idempotent)",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "201": {
+            "description": "Événement créé"
+          },
+          "409": {
+            "description": "Conflit ou clé d'idempotence réutilisée"
+          },
+          "422": {
+            "description": "Payload invalide ou client_ts hors fenêtre"
+          }
+        }
+      }
+    },
+    "/api/v1/uploads/presign": {
+      "post": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Génère une URL PUT pré-signée pour upload direct",
+        "operationId": "presign",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/uploads/{file_id}/confirm": {
+      "post": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Confirme l'upload et valide le fichier côté serveur",
+        "operationId": "confirm",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/referential/levels": {
+      "get": {
+        "tags": [
+          "referential"
+        ],
+        "summary": "Liste des niveaux scolaires",
+        "operationId": "list_levels",
+        "parameters": [
+          {
+            "name": "cycle",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Cycle"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtre par cycle",
+              "title": "Cycle"
+            },
+            "description": "Filtre par cycle"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse_LevelRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/referential/series": {
+      "get": {
+        "tags": [
+          "referential"
+        ],
+        "summary": "Liste des séries (lycée)",
+        "operationId": "list_series",
+        "parameters": [
+          {
+            "name": "cycle",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Cycle"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cycle"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse_SeriesRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/referential/subjects": {
+      "get": {
+        "tags": [
+          "referential"
+        ],
+        "summary": "Liste des matières",
+        "operationId": "list_subjects",
+        "parameters": [
+          {
+            "name": "cycle",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Cycle"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cycle"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse_SubjectRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/referential/chapters": {
+      "get": {
+        "tags": [
+          "referential"
+        ],
+        "summary": "Liste des chapitres",
+        "operationId": "list_chapters",
+        "parameters": [
+          {
+            "name": "level_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level Id"
+            }
+          },
+          {
+            "name": "subject_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Id"
+            }
+          },
+          {
+            "name": "series_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Series Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse_ChapterRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/referential/resources": {
+      "get": {
+        "tags": [
+          "referential"
+        ],
+        "summary": "Liste des ressources (sans contenu lourd)",
+        "operationId": "list_resources",
+        "parameters": [
+          {
+            "name": "chapter_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chapter Id"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ResourceType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2100,
+                  "minimum": 1980
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Year"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse_ResourceRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/referential/resources/{resource_id}": {
+      "get": {
+        "tags": [
+          "referential"
+        ],
+        "summary": "Détail d'une ressource (avec contenu + URL fichier)",
+        "operationId": "get_resource",
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceReadDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/referential/levels": {
+      "post": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Crée un niveau scolaire",
+        "operationId": "create_level",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LevelCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LevelRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/referential/levels/{id_}": {
+      "put": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Met à jour un niveau scolaire",
+        "operationId": "update_level",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LevelUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LevelRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Supprime un niveau scolaire",
+        "operationId": "delete_level",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/referential/series": {
+      "post": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Create Series",
+        "operationId": "create_series",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeriesCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/referential/series/{id_}": {
+      "put": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Update Series",
+        "operationId": "update_series",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeriesUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Delete Series",
+        "operationId": "delete_series",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/referential/subjects": {
+      "post": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Create Subject",
+        "operationId": "create_subject",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubjectCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/referential/subjects/{id_}": {
+      "put": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Update Subject",
+        "operationId": "update_subject",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubjectUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Delete Subject",
+        "operationId": "delete_subject",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/referential/chapters": {
+      "post": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Create Chapter",
+        "operationId": "create_chapter",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChapterCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChapterRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/referential/chapters/{id_}": {
+      "put": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Update Chapter",
+        "operationId": "update_chapter",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChapterUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChapterRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Delete Chapter",
+        "operationId": "delete_chapter",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/referential/resources": {
+      "post": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Create Resource",
+        "operationId": "create_resource",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResourceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/referential/resources/{id_}": {
+      "put": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Update Resource",
+        "operationId": "update_resource",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResourceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin:referential"
+        ],
+        "summary": "Delete Resource",
+        "operationId": "delete_resource",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id_",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id "
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AuthResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserRead"
+          },
+          "trusted_device_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trusted Device Token",
+            "description": "Présent si remember_device=true. À stocker côté client."
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in",
+          "user"
+        ],
+        "title": "AuthResponse"
+      },
+      "ChapterCreate": {
+        "properties": {
+          "level_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Level Id"
+          },
+          "subject_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Subject Id"
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id",
+            "description": "NULL si chapitre commun à toutes les séries"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "order_index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Order Index"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "level_id",
+          "subject_id",
+          "title",
+          "order_index"
+        ],
+        "title": "ChapterCreate",
+        "example": {
+          "description": "Configurations et applications",
+          "level_id": "550e8400-e29b-41d4-a716-446655440000",
+          "order_index": 3,
+          "subject_id": "550e8400-e29b-41d4-a716-446655440001",
+          "title": "Théorème de Thalès"
+        }
+      },
+      "ChapterRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "level_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Level Id"
+          },
+          "subject_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Subject Id"
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "order_index": {
+            "type": "integer",
+            "title": "Order Index"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "level_id",
+          "subject_id",
+          "series_id",
+          "title",
+          "description",
+          "order_index"
+        ],
+        "title": "ChapterRead"
+      },
+      "ChapterUpdate": {
+        "properties": {
+          "level_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level Id"
+          },
+          "subject_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Id"
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "order_index": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Index"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ChapterUpdate"
+      },
+      "ConfirmResponse": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FileStatus"
+          },
+          "size_kb": {
+            "type": "integer",
+            "title": "Size Kb"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "uploaded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Uploaded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "status",
+          "size_kb",
+          "mime_type",
+          "url",
+          "uploaded_at"
+        ],
+        "title": "ConfirmResponse"
+      },
+      "Cycle": {
+        "type": "string",
+        "enum": [
+          "college",
+          "lycee_moderne",
+          "lycee_technique"
+        ],
+        "title": "Cycle",
+        "description": "Cycle d'enseignement au Togo.\n\nLe lycée est scindé en deux types car les séries, les programmes et les\nexamens diffèrent :\n- ``lycee_moderne`` : séries générales (A4, C, D, E...)\n- ``lycee_technique`` : séries techniques (F1, F2, F3, F4...)"
+      },
+      "FileStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "uploaded",
+          "failed"
+        ],
+        "title": "FileStatus",
+        "description": "Statut d'un fichier dans son cycle de vie."
+      },
+      "ForgotPasswordRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "title": "ForgotPasswordRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LevelCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "cycle": {
+            "$ref": "#/components/schemas/Cycle"
+          },
+          "order_index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Order Index",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "cycle"
+        ],
+        "title": "LevelCreate",
+        "example": {
+          "cycle": "lycee_moderne",
+          "name": "2nde",
+          "order_index": 5
+        }
+      },
+      "LevelRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "cycle": {
+            "$ref": "#/components/schemas/Cycle"
+          },
+          "order_index": {
+            "type": "integer",
+            "title": "Order Index"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "cycle",
+          "order_index"
+        ],
+        "title": "LevelRead"
+      },
+      "LevelUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "cycle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cycle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "order_index": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Index"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LevelUpdate"
+      },
+      "LoginRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "OTPChannel": {
+        "type": "string",
+        "enum": [
+          "whatsapp",
+          "sms"
+        ],
+        "title": "OTPChannel",
+        "description": "Canal de livraison du code OTP."
+      },
+      "OTPSentResponse": {
+        "properties": {
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenge Id"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/OTPChannel"
+          },
+          "masked_phone": {
+            "type": "string",
+            "title": "Masked Phone"
+          },
+          "dev_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Code",
+            "description": "Uniquement en dev — code OTP en clair"
+          }
+        },
+        "type": "object",
+        "required": [
+          "challenge_id",
+          "expires_in",
+          "channel",
+          "masked_phone"
+        ],
+        "title": "OTPSentResponse",
+        "description": "Réponse des étapes 1 (register, login, forgot, resend)."
+      },
+      "PageResponse_ChapterRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChapterRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Nombre total d'éléments (toutes pages)"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "True s'il reste des éléments après cette page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "has_more"
+        ],
+        "title": "PageResponse[ChapterRead]"
+      },
+      "PageResponse_LevelRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LevelRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Nombre total d'éléments (toutes pages)"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "True s'il reste des éléments après cette page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "has_more"
+        ],
+        "title": "PageResponse[LevelRead]"
+      },
+      "PageResponse_ResourceRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Nombre total d'éléments (toutes pages)"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "True s'il reste des éléments après cette page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "has_more"
+        ],
+        "title": "PageResponse[ResourceRead]"
+      },
+      "PageResponse_SeriesRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Nombre total d'éléments (toutes pages)"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "True s'il reste des éléments après cette page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "has_more"
+        ],
+        "title": "PageResponse[SeriesRead]"
+      },
+      "PageResponse_SubjectRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Nombre total d'éléments (toutes pages)"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "True s'il reste des éléments après cette page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "has_more"
+        ],
+        "title": "PageResponse[SubjectRead]"
+      },
+      "PresignRequest": {
+        "properties": {
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "file_type": {
+            "type": "string",
+            "title": "File Type",
+            "description": "MIME type (whitelist : image/webp, image/jpeg, application/pdf)"
+          },
+          "size_kb": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Size Kb"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/UploadPurpose"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "file_type",
+          "size_kb",
+          "purpose"
+        ],
+        "title": "PresignRequest",
+        "description": "Corps de POST /uploads/presign."
+      },
+      "PresignResponse": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "s3_key": {
+            "type": "string",
+            "title": "S3 Key"
+          },
+          "upload_url": {
+            "type": "string",
+            "title": "Upload Url"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": "PUT"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Headers"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "s3_key",
+          "upload_url",
+          "headers",
+          "expires_at"
+        ],
+        "title": "PresignResponse"
+      },
+      "RefreshRequest": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 20,
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshRequest",
+        "description": "Demande de rotation de refresh token."
+      },
+      "RegisterRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "First Name"
+          },
+          "last_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Last Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Password"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole",
+            "default": "student"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "first_name",
+          "last_name",
+          "password"
+        ],
+        "title": "RegisterRequest"
+      },
+      "ResendOTPRequest": {
+        "properties": {
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenge Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "challenge_id"
+        ],
+        "title": "ResendOTPRequest"
+      },
+      "ResetPasswordRequest": {
+        "properties": {
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenge Id"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Code"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "challenge_id",
+          "code",
+          "new_password"
+        ],
+        "title": "ResetPasswordRequest"
+      },
+      "ResourceCreate": {
+        "properties": {
+          "chapter_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "content_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Text",
+            "description": "Contenu Markdown affichable directement"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id",
+            "description": "FK vers stored_files (PDF)"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2100.0,
+                "minimum": 1980.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ResourceOrigin",
+            "default": "admin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "title"
+        ],
+        "title": "ResourceCreate",
+        "example": {
+          "chapter_id": "550e8400-e29b-41d4-a716-446655440000",
+          "content_text": "# Théorème de Thalès\n\n...",
+          "origin": "admin",
+          "title": "Théorème de Thalès — cours",
+          "type": "cours"
+        }
+      },
+      "ResourceOrigin": {
+        "type": "string",
+        "enum": [
+          "admin",
+          "teacher",
+          "ia"
+        ],
+        "title": "ResourceOrigin",
+        "description": "Source d'une ressource pédagogique."
+      },
+      "ResourceRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "chapter_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ResourceOrigin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "chapter_id",
+          "type",
+          "title",
+          "file_id",
+          "year",
+          "origin"
+        ],
+        "title": "ResourceRead",
+        "description": "Vue allégée (pas de ``content_text``) pour les listes."
+      },
+      "ResourceReadDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "chapter_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ResourceType"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ResourceOrigin"
+          },
+          "content_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Text"
+          },
+          "file_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Url",
+            "description": "URL presignée (TTL 1h) si le fichier existe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "chapter_id",
+          "type",
+          "title",
+          "file_id",
+          "year",
+          "origin"
+        ],
+        "title": "ResourceReadDetail",
+        "description": "Vue détaillée avec ``content_text`` + URL S3 presign si file."
+      },
+      "ResourceType": {
+        "type": "string",
+        "enum": [
+          "cours",
+          "exercice",
+          "annale",
+          "corrige"
+        ],
+        "title": "ResourceType",
+        "description": "Type de ressource pédagogique."
+      },
+      "ResourceUpdate": {
+        "properties": {
+          "chapter_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResourceType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "content_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Text"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2100.0,
+                "minimum": 1980.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResourceOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ResourceUpdate"
+      },
+      "SeriesCreate": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "cycle": {
+            "$ref": "#/components/schemas/Cycle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "cycle"
+        ],
+        "title": "SeriesCreate",
+        "example": {
+          "code": "A4",
+          "cycle": "lycee_moderne",
+          "description": "Série orientée lettres et langues vivantes.",
+          "name": "Série A4 - Littéraire et Langues"
+        }
+      },
+      "SeriesRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "cycle": {
+            "$ref": "#/components/schemas/Cycle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "name",
+          "cycle",
+          "description"
+        ],
+        "title": "SeriesRead"
+      },
+      "SeriesUpdate": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "cycle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cycle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SeriesUpdate"
+      },
+      "SubjectCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "icon_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon Url"
+          },
+          "cycle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cycle"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NULL = matière transverse à tous les cycles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SubjectCreate",
+        "example": {
+          "icon_url": "https://cdn.coindetude.tg/icons/maths.svg",
+          "name": "Mathématiques"
+        }
+      },
+      "SubjectRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "icon_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon Url"
+          },
+          "cycle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cycle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "icon_url",
+          "cycle"
+        ],
+        "title": "SubjectRead"
+      },
+      "SubjectUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "icon_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon Url"
+          },
+          "cycle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cycle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SubjectUpdate"
+      },
+      "SyncEntityType": {
+        "type": "string",
+        "enum": [
+          "planning_task",
+          "xp_event",
+          "streak_event"
+        ],
+        "title": "SyncEntityType",
+        "description": "Types d'entités supportés par /sync/apply-event."
+      },
+      "SyncEventRequest": {
+        "properties": {
+          "entity_type": {
+            "$ref": "#/components/schemas/SyncEntityType"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/SyncOperation"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload",
+            "description": "Contenu de l'entité (objet JSON direct)"
+          },
+          "client_ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Client Ts",
+            "description": "Horodatage client ISO 8601 UTC (tolérance ±7 jours)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "entity_type",
+          "operation",
+          "payload",
+          "client_ts"
+        ],
+        "title": "SyncEventRequest",
+        "description": "Requête POST /sync/apply-event.\n\n⚠️ ``payload`` est un objet JSON direct (pas une string échappée).\nCela réduit la taille du body (~30%) et évite les erreurs de parsing."
+      },
+      "SyncOperation": {
+        "type": "string",
+        "enum": [
+          "create",
+          "update",
+          "delete"
+        ],
+        "title": "SyncOperation",
+        "description": "Opération CRDT envoyée par un client offline-first."
+      },
+      "TokenPair": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in"
+        ],
+        "title": "TokenPair"
+      },
+      "UploadPurpose": {
+        "type": "string",
+        "enum": [
+          "avatar",
+          "homework_scan",
+          "resource_pdf"
+        ],
+        "title": "UploadPurpose",
+        "description": "Purpose déclaré par le client au presign."
+      },
+      "UserRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "phone_verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Verified At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "first_name",
+          "last_name",
+          "phone",
+          "email",
+          "role",
+          "is_active"
+        ],
+        "title": "UserRead"
+      },
+      "UserRole": {
+        "type": "string",
+        "enum": [
+          "student",
+          "parent",
+          "teacher",
+          "admin"
+        ],
+        "title": "UserRole",
+        "description": "Rôle d'un utilisateur dans la plateforme."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VerifyOTPRequest": {
+        "properties": {
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenge Id"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Code"
+          },
+          "remember_device": {
+            "type": "boolean",
+            "title": "Remember Device",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "challenge_id",
+          "code"
+        ],
+        "title": "VerifyOTPRequest"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "scopes": {},
+            "tokenUrl": "/api/v1/auth/login"
+          }
+        }
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Entrez votre JWT sous la forme : `Bearer <access_token>`.\nObtenu via `POST /api/v1/auth/verify-otp` ou `POST /api/v1/auth/refresh`."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "**Authentification & Sessions** — Enregistrement, challenge OTP par SMS ou WhatsApp, connexion par mot de passe, rafraîchissement des tokens JWT, déconnexion et gestion des appareils de confiance."
+    },
+    {
+      "name": "referential",
+      "description": "**Référentiel Pédagogique Public** — Consultation en lecture seule des cycles officiels togolais (Primaire, Collège, Lycée), des niveaux (CEPD, BEPC, BAC), des séries, des matières, des chapitres et des fiches ressources. Mis en cache distribué Redis avec headers HTTP Cache-Control."
+    },
+    {
+      "name": "sync",
+      "description": "**Synchronisation Offline-First** — Réplication des mutations effectuées hors-ligne sur l'application mobile Flutter (progression, tâches de révision). Garantie d'idempotence stricte via le header `Idempotency-Key` (UUID v4)."
+    },
+    {
+      "name": "uploads",
+      "description": "**Uploads & Stockage d'Objets** — Négociation d'URLs pré-signées (S3 / Cloudflare R2) pour l'upload direct de binaires (avatars, documents, PDF) sans saturer la bande passante du backend, suivi de la confirmation d'intégrité."
+    },
+    {
+      "name": "admin:referential",
+      "description": "**Administration du Référentiel** — Opérations CRUD complètes sur les niveaux, séries, matières, chapitres et ressources pédagogiques. Strictement réservé aux utilisateurs ayant le rôle `admin`."
+    },
+    {
+      "name": "health",
+      "description": "**Santé & Observabilité** — Probes de liveness (`/health`) et de readiness (`/health/ready` vérifiant les connexions actives PostgreSQL et Redis)."
+    }
+  ],
+  "x-tagGroups": [
+    {
+      "name": "Authentification & Sécurité",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "name": "Pédagogie & Contenus",
+      "tags": [
+        "referential",
+        "admin:referential"
+      ]
+    },
+    {
+      "name": "Offline & Fichiers",
+      "tags": [
+        "sync",
+        "uploads"
+      ]
+    },
+    {
+      "name": "Système & Observabilité",
+      "tags": [
+        "health"
+      ]
+    }
+  ]
+}

@@ -17,3 +17,4 @@ firebase-credentials.json
 .vscode/
 .idea/
 .DS_Store
+.cache/

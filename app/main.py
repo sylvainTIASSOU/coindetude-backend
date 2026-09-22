@@ -14,10 +14,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging, log
+from app.core.openapi import custom_generate_unique_id, custom_openapi_factory
 from app.db.redis import close_redis, ping_redis
 from app.db.seed.runner import schedule_auto_seed
 
@@ -81,7 +83,11 @@ app = FastAPI(
     docs_url="/docs" if settings.ENVIRONMENT != "prod" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT != "prod" else None,
     lifespan=lifespan,
+    generate_unique_id_function=custom_generate_unique_id,
 )
+
+# Attachement de la factory OpenAPI enrichie
+app.openapi = lambda: custom_openapi_factory(app)  # type: ignore[method-assign]
 
 if settings.BACKEND_CORS_ORIGINS:
     app.add_middleware(
@@ -93,3 +99,10 @@ if settings.BACKEND_CORS_ORIGINS:
     )
 
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+
+@app.get("/openapi.json", include_in_schema=False)
+async def get_root_openapi() -> JSONResponse:
+    """Expose également le schéma OpenAPI à la racine pour l'outillage client."""
+    return JSONResponse(content=app.openapi())
+

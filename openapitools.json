@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.8.0",
+    "generators": {
+      "flutter-sdk": {
+        "generatorName": "dart-dio",
+        "output": "packages/coindetude_api",
+        "inputSpec": "openapi.json",
+        "additionalProperties": {
+          "pubName": "coindetude_api",
+          "pubVersion": "0.1.0",
+          "pubDescription": "SDK Dart/Flutter officiel pour l'API CoinDétude",
+          "pubAuthor": "Équipe CoinDétude <contact@coindetude.tg>",
+          "pubHomepage": "https://coindetude-backend.fastapicloud.dev",
+          "pubRepository": "https://github.com/sylvainTIASSOU/coindetude-backend",
+          "nullSafe": true,
+          "serializationLibrary": "built_value",
+          "dateLibrary": "core",
+          "useEnumExtension": true,
+          "sortModelPropertiesByRequiredFlag": true,
+          "sortParamsByRequiredFlag": true
+        }
+      }
+    }
+  }
+}
+

@@ -1,0 +1,21 @@
+# Configuration pour le générateur dart-dio d'openapi-generator-cli
+# Documentation : https://openapi-generator.tech/docs/generators/dart-dio/
+
+generatorName: dart-dio
+outputDir: packages/coindetude_api
+inputSpec: openapi.json
+
+additionalProperties:
+  pubName: coindetude_api
+  pubVersion: 0.1.0
+  pubDescription: "SDK Dart/Flutter officiel pour l'API CoinDétude (plateforme de révision scolaire Togo)"
+  pubAuthor: "Équipe CoinDétude <contact@coindetude.tg>"
+  pubHomepage: "https://coindetude-backend.fastapicloud.dev"
+  pubRepository: "https://github.com/sylvainTIASSOU/coindetude-backend"
+  nullSafe: true
+  serializationLibrary: built_value
+  dateLibrary: core
+  useEnumExtension: true
+  sortModelPropertiesByRequiredFlag: true
+  sortParamsByRequiredFlag: true
+

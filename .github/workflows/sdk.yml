@@ -1,0 +1,102 @@
+name: SDK Generation & Publish
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "app/**"
+      - "scripts/**"
+      - "openapi-generator-config.yaml"
+      - ".github/workflows/sdk.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      sdk_version:
+        description: "Version du SDK Dart (ex: 0.1.0)"
+        required: false
+        default: "0.1.0"
+
+jobs:
+  check-drift:
+    name: Check OpenAPI Drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry==1.8.4
+
+      - name: Install dependencies
+        run: poetry install --with dev --no-root
+
+      - name: Verify OpenAPI schema sync
+        run: poetry run python -m scripts.export_openapi --check
+
+  build-dart-sdk:
+    name: Generate & Verify Dart SDK
+    runs-on: ubuntu-latest
+    needs: check-drift
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry==1.8.4
+
+      - name: Install backend dependencies
+        run: poetry install --with dev --no-root
+
+      - name: Export OpenAPI Spec
+        run: poetry run python -m scripts.export_openapi --output openapi.json
+
+      - name: Generate Dart/Flutter SDK (dart-dio)
+        uses: docker://openapitools/openapi-generator-cli:v7.8.0
+        with:
+          args: >-
+            generate
+            -c /github/workspace/openapi-generator-config.yaml
+            -i /github/workspace/openapi.json
+            -o /github/workspace/packages/coindetude_api
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Build & Analyze Dart SDK
+        working-directory: packages/coindetude_api
+        run: |
+          dart pub get
+          if grep -q "build_runner" pubspec.yaml 2>/dev/null; then
+            dart run build_runner build --delete-conflicting-outputs
+          fi
+          dart analyze
+
+      - name: Archive Generated SDK
+        uses: actions/upload-artifact@v4
+        with:
+          name: coindetude-dart-sdk
+          path: packages/coindetude_api/
+          retention-days: 14
+
+      - name: Package SDK Zip for Release
+        if: github.event_name == 'release'
+        working-directory: packages/coindetude_api
+        run: |
+          zip -r ../../coindetude-dart-sdk-${{ github.event.release.tag_name }}.zip .
+
+      - name: Upload Release Asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: coindetude-dart-sdk-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

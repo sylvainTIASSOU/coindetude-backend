@@ -24,12 +24,12 @@ ENV PYTHONUNBUFFERED=1 \
 # - git             : Poetry peut vouloir cloner des deps git
 # - make            : utile pour les Makefile éventuels
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        curl \
-        git \
-        libpq-dev \
-        postgresql-client \
-        make \
+    build-essential \
+    curl \
+    git \
+    libpq-dev \
+    postgresql-client \
+    make \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir poetry==2.4.3
@@ -38,7 +38,7 @@ WORKDIR /coindetude-backend
 
 # --- Santé par défaut (utile pour le devcontainer) ---
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://localhost:8000/api/v1/health || exit 1
+    CMD curl -fsS http://localhost:8008/api/v1/health || exit 1
 
 # ---------- Développement (utilisé par .devcontainer) ----------
 FROM base AS development
@@ -49,14 +49,15 @@ RUN poetry install --no-root --with dev
 COPY . .
 RUN poetry install --with dev
 
-EXPOSE 8000
-CMD ["poetry", "run", "fastapi", "dev", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8008
+CMD ["poetry", "run", "fastapi", "dev", "app/main.py", "--host", "0.0.0.0", "--port", "8008"]
 
 
 # ---------- Production ----------
 FROM base AS production
 
 COPY pyproject.toml poetry.lock* ./
+COPY README.md ./
 RUN poetry install --no-root --only main
 
 COPY app ./app
@@ -65,5 +66,5 @@ RUN poetry install --only main
 RUN useradd --create-home appuser
 USER appuser
 
-EXPOSE 8000
-CMD ["poetry", "run", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8008
+CMD ["poetry", "run", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8008"]

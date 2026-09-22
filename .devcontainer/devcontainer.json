@@ -15,7 +15,7 @@
 
   // --- Ports forwardés ---
   "forwardPorts": [
-    8000, // FastAPI
+    8008, // FastAPI
     5432, // PostgreSQL
     6379, // Redis
     8080, // Adminer
@@ -23,7 +23,7 @@
     9001 // MinIO Console
   ],
   "portsAttributes": {
-    "8000": { "label": "FastAPI", "onAutoForward": "notify" },
+    "8008": { "label": "FastAPI", "onAutoForward": "notify" },
     "5432": { "label": "PostgreSQL", "onAutoForward": "silent" },
     "6379": { "label": "Redis", "onAutoForward": "silent" },
     "8080": { "label": "Adminer", "onAutoForward": "silent" },
@@ -119,34 +119,24 @@
       },
 
       "extensions": [
-        // --- Python ---
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-python.mypy-type-checker",
         "charliermarsh.ruff",
-
-        // --- Base de données ---
         "mtxr.sqltools",
         "mtxr.sqltools-driver-pg",
         "cweijan.vscode-redis-client",
-
-        // --- API testing ---
         "humao.rest-client",
-
-        // --- Ergonomie ---
         "usernamehw.errorlens",
         "njpwerner.autodocstring",
         "tamasfe.even-better-toml",
         "redhat.vscode-yaml",
         "bierner.markdown-mermaid",
-
-        // --- Docker & Git ---
         "ms-azuretools.vscode-docker",
         "eamodio.gitlens",
         "mhutchie.git-graph",
-
-        // --- IA (optionnel, tu peux le retirer) ---
-        "anthropic.claude-code"
+        "anthropic.claude-code",
+        "google.google-antigravity"
       ]
     }
   },

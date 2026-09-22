@@ -1036,7 +1036,7 @@ files = [
     {file = "coverage-7.16.0-cp315-cp315t-musllinux_1_2_x86_64.whl", hash = "sha256:49fa72ead28c8216f8916398a4f3c4669acb30a061822810ee20a727a1be2897"},
     {file = "coverage-7.16.0-cp315-cp315t-win32.whl", hash = "sha256:27461af9f3ed7d2cf2411eb083784f87055ebf42211789ae3a216c48609bc743"},
     {file = "coverage-7.16.0-cp315-cp315t-win_amd64.whl", hash = "sha256:c5612cc20ca76abc883e50269af47c1494b42958bb63dbb9aa79729a1ab5f7d3"},
-    {file = "coverage-7.16.0-cp315-cp315t-win_arm64.whl", hash = "sha256:2ddaa9e2af4760a329d80008b7a3b4762fbb0dbcb169199360f9a5179c32f2dc"},
+    {file = "coverage-7.16.0-cp315-cp315t-win_arm64.whl", hash = "sha256:2ddaa9e2af4760a329d80088b7a3b4762fbb0dbcb169199360f9a5179c32f2dc"},
     {file = "coverage-7.16.0-py3-none-any.whl", hash = "sha256:245f7de6d023a5bba375dbec9f2e0869bfa26ac0cc639bbb7b4c814884000b73"},
     {file = "coverage-7.16.0.tar.gz", hash = "sha256:077f0964087883176ff6ab9b074694cae29f8c708273b13ca62c183c6ed716cd"},
 ]
@@ -1442,7 +1442,7 @@ files = [
     {file = "fastar-0.12.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:e2b8394d4c417dbc05c3a5c45e6c9742d5e78ce07e6eaf18894218c0a9dae5d0"},
     {file = "fastar-0.12.0-cp39-cp39-manylinux_2_12_i686.manylinux2010_i686.whl", hash = "sha256:bfa2891ee4bd86b71721b0afa6c410c2917c86522dffc13a5aba2038d147e81f"},
     {file = "fastar-0.12.0-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:dfc34a941607a44563ec4b4f0f5c7af7f237bceab73c372f1987d505ecd6165c"},
-    {file = "fastar-0.12.0-cp39-cp39-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:fc7f09c635194e5e673703cffbd1eda80773edb8000faa42da158b8ea1ce5018"},
+    {file = "fastar-0.12.0-cp39-cp39-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:fc7f09c635194e5e673703cffbd1eda80773edb8008faa42da158b8ea1ce5018"},
     {file = "fastar-0.12.0-cp39-cp39-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:91d6929f821729abc10b754180675dcd2e5328ac12d28abef4409afebd1a8c59"},
     {file = "fastar-0.12.0-cp39-cp39-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:bec95651f31caa9f505bbeb2019187e2f0ec561548ae0cd33cfa753ef59492ac"},
     {file = "fastar-0.12.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:aef3e8f913fcf2150e664bfbdca9462c6472ad1c1c553f4b58c1b5d2b34807f5"},
@@ -4367,7 +4367,7 @@ oracle = ["cx_oracle (>=8)"]
 oracle-oracledb = ["oracledb (>=1.0.1)"]
 postgresql = ["psycopg2 (>=2.7)"]
 postgresql-asyncpg = ["asyncpg", "greenlet (>=1)"]
-postgresql-pg8000 = ["pg8000 (>=1.29.1)"]
+postgresql-pg8008 = ["pg8008 (>=1.29.1)"]
 postgresql-psycopg = ["psycopg (>=3.0.7)"]
 postgresql-psycopg2binary = ["psycopg2-binary"]
 postgresql-psycopg2cffi = ["psycopg2cffi"]
@@ -4571,7 +4571,7 @@ files = [
     {file = "uvloop-0.22.1-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:561577354eb94200d75aca23fbde86ee11be36b00e52a4eaf8f50fb0c86b7705"},
     {file = "uvloop-0.22.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:1cdf5192ab3e674ca26da2eada35b288d2fa49fdd0f357a19f0e7c4e7d5077c8"},
     {file = "uvloop-0.22.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:6e2ea3d6190a2968f4a14a23019d3b16870dd2190cd69c8180f7c632d21de68d"},
-    {file = "uvloop-0.22.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0530a5fbad9c9e4ee3f2b33b148c6a64d47bbad8000ea63704fa8260f4cf728e"},
+    {file = "uvloop-0.22.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0530a5fbad9c9e4ee3f2b33b148c6a64d47bbad8008ea63704fa8260f4cf728e"},
     {file = "uvloop-0.22.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:bc5ef13bbc10b5335792360623cc378d52d7e62c2de64660616478c32cd0598e"},
     {file = "uvloop-0.22.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:1f38ec5e3f18c8a10ded09742f7fb8de0108796eb673f30ce7762ce1b8550cad"},
     {file = "uvloop-0.22.1-cp314-cp314-macosx_10_13_universal2.whl", hash = "sha256:3879b88423ec7e97cd4eba2a443aa26ed4e59b45e6b76aabf13fe2f27023a142"},

@@ -31,7 +31,7 @@ API FastAPI de CoinDétude, plateforme de révision pour les élèves togolais
    make migrate
    make dev
    ```
-6. API sur http://localhost:8000/docs — Adminer sur http://localhost:8080
+6. API sur http://localhost:8008/docs — Adminer sur http://localhost:8080
    (système `PostgreSQL`, serveur `db`, utilisateur/mdp/base comme dans `.env`).
 
 ## Démarrage sans devcontainer
