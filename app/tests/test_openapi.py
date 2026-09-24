@@ -44,7 +44,7 @@ def test_openapi_metadata_enrichment() -> None:
     assert "servers" in schema
     assert len(schema["servers"]) == len(OPENAPI_SERVERS)
     server_urls = [s["url"] for s in schema["servers"]]
-    assert "http://localhost:8000" in server_urls
+    assert "/" in server_urls or "https://coindetude-backend.fastapicloud.dev" in server_urls
     assert "https://api.coindetude.tg" in server_urls
 
     # Tags thématiques ordonnés

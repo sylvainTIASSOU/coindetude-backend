@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, health, referential, sync, uploads
+from app.api.v1.endpoints import auth, health, referential, students, sync, uploads
 from app.api.v1.endpoints.admin import referential as admin_referential
 
 api_router = APIRouter()
@@ -10,6 +10,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(sync.router)
 api_router.include_router(uploads.router)
+api_router.include_router(students.router)
 api_router.include_router(referential.router)
 api_router.include_router(admin_referential.router)
 

@@ -17,8 +17,8 @@
   },
   "servers": [
     {
-      "url": "http://localhost:8000",
-      "description": "Serveur de développement local"
+      "url": "/",
+      "description": "Serveur API courant"
     },
     {
       "url": "https://staging-api.coindetude.tg",
@@ -643,6 +643,207 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/students/me/profile/options": {
+      "get": {
+        "tags": [
+          "students"
+        ],
+        "summary": "Options d'onboarding (cycles, niveaux, séries)",
+        "description": "Retourne tous les cycles disponibles avec leurs niveaux et séries. Utilisé par l'écran d'onboarding élève. Caché 1h côté serveur + `Cache-Control: public, max-age=3600` pour le client.",
+        "operationId": "get_profile_options",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOptionsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/students/me/profile": {
+      "get": {
+        "tags": [
+          "students"
+        ],
+        "summary": "Mon profil élève",
+        "operationId": "get_my_profile",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentProfileRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "students"
+        ],
+        "summary": "Crée ou met à jour le profil élève (niveau + série)",
+        "description": "Endpoint idempotent. Le client envoie le **nom** du niveau et le **code** de la série (pas les UUIDs). Le serveur résout les entités et valide la compatibilité niveau ↔ série via `level_series`.\n\nUn élève de cycle `college` ne peut pas avoir de série.",
+        "operationId": "upsert_my_profile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentProfileUpsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Profil mis à jour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentProfileRead"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "L'utilisateur n'est pas un élève"
+          },
+          "404": {
+            "description": "Niveau ou série introuvable"
+          },
+          "422": {
+            "description": "Série non autorisée pour ce niveau, ou payload invalide"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/students/me/profile/regenerate-pairing-code": {
+      "post": {
+        "tags": [
+          "students"
+        ],
+        "summary": "Régénère le code de liaison parent",
+        "description": "Invalide l'ancien code et en génère un nouveau à 6 caractères. À utiliser si le code a été partagé par erreur. **Les liens parents existants ne sont pas supprimés** — seul le code de liaison change.",
+        "operationId": "regenerate_pairing_code",
+        "responses": {
+          "200": {
+            "description": "Nouveau code retourné",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Regenerate Pairing Code"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "L'utilisateur n'est pas un élève"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/profile": {
+      "get": {
+        "tags": [
+          "students"
+        ],
+        "summary": "Profil d'un élève (parent uniquement)",
+        "description": "Lecture du profil d'un enfant par un parent. Le lien `parent_student` doit exister. Le `pairing_code` n'est **jamais** exposé à un tiers.",
+        "operationId": "get_student_profile_for_guardian",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentProfilePublic"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pas de lien parent-élève"
+          },
+          "404": {
+            "description": "Profil introuvable"
           },
           "422": {
             "description": "Validation Error",
@@ -2193,6 +2394,27 @@
         "title": "Cycle",
         "description": "Cycle d'enseignement au Togo.\n\nLe lycée est scindé en deux types car les séries, les programmes et les\nexamens diffèrent :\n- ``lycee_moderne`` : séries générales (A4, C, D, E...)\n- ``lycee_technique`` : séries techniques (F1, F2, F3, F4...)"
       },
+      "CycleOptions": {
+        "properties": {
+          "cycle": {
+            "$ref": "#/components/schemas/Cycle"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/LevelWithSeries"
+            },
+            "type": "array",
+            "title": "Levels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cycle",
+          "levels"
+        ],
+        "title": "CycleOptions",
+        "description": "Toutes les options d'un cycle."
+      },
       "FileStatus": {
         "type": "string",
         "enum": [
@@ -2329,6 +2551,27 @@
         "additionalProperties": false,
         "type": "object",
         "title": "LevelUpdate"
+      },
+      "LevelWithSeries": {
+        "properties": {
+          "level": {
+            "$ref": "#/components/schemas/LevelRead"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesRead"
+            },
+            "type": "array",
+            "title": "Series",
+            "description": "Vide pour les niveaux du collège"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level"
+        ],
+        "title": "LevelWithSeries",
+        "description": "Niveau + séries autorisées pour ce niveau."
       },
       "LoginRequest": {
         "properties": {
@@ -2669,6 +2912,29 @@
           "expires_at"
         ],
         "title": "PresignResponse"
+      },
+      "ProfileOptionsResponse": {
+        "properties": {
+          "cycles": {
+            "items": {
+              "$ref": "#/components/schemas/CycleOptions"
+            },
+            "type": "array",
+            "title": "Cycles"
+          },
+          "cache_ttl": {
+            "type": "integer",
+            "title": "Cache Ttl",
+            "description": "TTL recommandé côté client (s)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cycles",
+          "cache_ttl"
+        ],
+        "title": "ProfileOptionsResponse",
+        "description": "Réponse de ``GET /students/me/profile/options``.\n\nFournit au client toutes les données nécessaires pour l'onboarding en\nun seul appel (frugalité réseau)."
       },
       "RefreshRequest": {
         "properties": {
@@ -3259,6 +3525,193 @@
         "additionalProperties": false,
         "type": "object",
         "title": "SeriesUpdate"
+      },
+      "StudentProfilePublic": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LevelRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeriesRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "xp_points": {
+            "type": "integer",
+            "title": "Xp Points"
+          },
+          "current_streak": {
+            "type": "integer",
+            "title": "Current Streak"
+          },
+          "longest_streak": {
+            "type": "integer",
+            "title": "Longest Streak"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "first_name",
+          "last_name",
+          "xp_points",
+          "current_streak",
+          "longest_streak"
+        ],
+        "title": "StudentProfilePublic",
+        "description": "Vue du profil élève pour un tiers (parent).\n\n⚠️ Le ``pairing_code`` est **omis** (donnée sensible)."
+      },
+      "StudentProfileRead": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LevelRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeriesRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "xp_points": {
+            "type": "integer",
+            "title": "Xp Points"
+          },
+          "current_streak": {
+            "type": "integer",
+            "title": "Current Streak"
+          },
+          "longest_streak": {
+            "type": "integer",
+            "title": "Longest Streak"
+          },
+          "last_streak_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Streak Date"
+          },
+          "pairing_code": {
+            "type": "string",
+            "title": "Pairing Code",
+            "description": "Code à 6 caractères pour lier un parent (privé)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "xp_points",
+          "current_streak",
+          "longest_streak",
+          "pairing_code"
+        ],
+        "title": "StudentProfileRead",
+        "description": "Vue complète du profil élève (avec entités imbriquées)."
+      },
+      "StudentProfileUpsertRequest": {
+        "properties": {
+          "cycle": {
+            "$ref": "#/components/schemas/Cycle"
+          },
+          "level_name": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Level Name"
+          },
+          "series_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "cycle",
+          "level_name"
+        ],
+        "title": "StudentProfileUpsertRequest",
+        "description": "Payload de ``PUT /students/me/profile``.\n\nLe client envoie le **nom** du niveau et le **code** de la série (pas les\nUUIDs) — plus naturel pour l'onboarding. Le serveur résout les entités.\n\n**Règles** :\n- ``cycle == college`` → ``series_code`` doit être ``None`` (ou omis).\n- ``cycle != college`` → ``series_code`` optionnel (élève peut compléter\n  plus tard), mais si fourni, doit exister ET être autorisé pour ce niveau.",
+        "examples": [
+          {
+            "summary": "Collégien (3ème)",
+            "value": {
+              "cycle": "college",
+              "level_name": "3ème"
+            }
+          },
+          {
+            "summary": "Lycéen moderne (Terminale D)",
+            "value": {
+              "cycle": "lycee_moderne",
+              "level_name": "Terminale",
+              "series_code": "D"
+            }
+          },
+          {
+            "summary": "Lycéen technique (1ère F2)",
+            "value": {
+              "cycle": "lycee_technique",
+              "level_name": "1ère",
+              "series_code": "F2"
+            }
+          }
+        ]
       },
       "SubjectCreate": {
         "properties": {

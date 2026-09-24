@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.1.0"
     ENVIRONMENT: Literal["dev", "staging", "prod"] = "dev"
     API_V1_PREFIX: str = "/api/v1"
+    PUBLIC_API_URL: str = "/"
     DEBUG: bool = True
 
     # --- Sécurité ---

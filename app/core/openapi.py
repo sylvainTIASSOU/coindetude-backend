@@ -90,8 +90,8 @@ OPENAPI_TAG_GROUPS: list[dict[str, Any]] = [
 # --- Environnements / Serveurs ---
 OPENAPI_SERVERS: list[dict[str, str]] = [
     {
-        "url": "http://localhost:8000",
-        "description": "Serveur de développement local",
+        "url": settings.PUBLIC_API_URL,
+        "description": "Serveur API courant",
     },
     {
         "url": "https://staging-api.coindetude.tg",

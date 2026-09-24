@@ -368,13 +368,14 @@ class AuthService:
             dev_code=getattr(self.otp, "_last_dev_code", None),
         )
 
+    # app/services/auth_service.py — méthode _create_profile_and_preferences
     async def _create_profile_and_preferences(self, user: User) -> None:
         if user.role is UserRole.STUDENT:
-            import secrets as _secrets
-
-            alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-            code = "".join(_secrets.choice(alphabet) for _ in range(6))
-            self.session.add(StudentProfile(user_id=user.id, pairing_code=code))
+            from app.services.students.service import StudentsService
+            code = StudentsService._generate_pairing_code()
+            self.session.add(
+                StudentProfile(user_id=user.id, pairing_code=code)
+            )
         elif user.role is UserRole.PARENT:
             self.session.add(ParentProfile(user_id=user.id))
         self.session.add(NotificationPreference(user_id=user.id))

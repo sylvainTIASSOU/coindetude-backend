@@ -29,17 +29,18 @@ class ConflictError(Exception):
 
 
 async def _invalidate(entity_name: str) -> None:
-    """Invalide le cache d'une entité (versioning)."""
     redis = await get_redis()
-    await ReferentialCache(redis).invalidate(entity_name)
-    # Invalide aussi les listes dépendantes (relations FK)
+    cache = ReferentialCache(redis)
+    await cache.invalidate(entity_name)
     if entity_name in ("levels", "subjects", "series"):
-        await ReferentialCache(redis).invalidate("chapters")
-    if entity_name in ("chapters",):
-        await ReferentialCache(redis).invalidate("resources")
+        await cache.invalidate("chapters")
+        # ⚠️ Le profil options agrège levels + series
+        await cache.invalidate("profile_options")
+    if entity_name == "chapters":
+        await cache.invalidate("resources")
 
 
-async def create_entity(
+async def create_entity[ModelT](
     session: AsyncSession,
     *,
     model: type[ModelT],
